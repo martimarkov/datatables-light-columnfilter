@@ -5,7 +5,7 @@
  * A light filter column pluggin for jquery.dataTables#1.10
  */
 (function (window, document) {
-    var factory = function ($, dataTable) {
+    var factory = function ($, dataTable, $q) {
         'use strict';
 
         var
@@ -97,11 +97,16 @@
                 var self = this,
                     regex = regex || false;
 
-                self
-                    .dataTableColumn
-                    .search(self.request(), regex)
-                    .draw()
-                ;
+                self.request().then(function (data) {
+                        self
+                            .dataTableColumn
+                            .search(data, regex)
+                            .draw()
+                        ;
+                    }
+                )
+
+
             }
         }
 
@@ -195,23 +200,26 @@
                  */
                 dom: function (th) {
                     var self = this;
+                    self.elements = $q.defer(); //Make your own promise
 
-                    self.elements = $('<input>', {
+                    var elements = $('<input>', {
                         type: self.options.type || 'text'
                     }).appendTo(th);
 
 
                     $.each(self.options.attr, function (key, value) {
-                        self.elements.attr(key, value);
+                        elements.attr(key, value);
                     })
 
                     if (typeof self.options.width !== 'undefined') {
-                        self.elements.css('width', self.options.width);
+                        elements.css('width', self.options.width);
                     } else {
-                        self.elements.css('width', '100%');
+                        elements.css('width', '100%');
                     }
+                    self.elements.resolve(elements);
 
-                    return self.elements;
+
+                    return self.elements.promise;
                 },
                 /**
                  * Binds event to the DOM elements
@@ -233,12 +241,13 @@
                     if ('regex' in self.options) {
                         regex = self.options.regex;
                     }
-
-                    self.elements.keyup(function () {
-                        clearTimeout(timeOutId);
-                        timeOutId = window.setTimeout(function () {
-                            self.search(regex);
-                        }, time);
+                    self.elements.promise.then(function (data) {
+                        data.keyup(function () {
+                            clearTimeout(timeOutId);
+                            timeOutId = window.setTimeout(function () {
+                                self.search(regex);
+                            }, time);
+                        });
                     });
                 },
                 /**
@@ -248,8 +257,9 @@
                  */
                 request: function () {
                     var self = this;
-
-                    return self.elements.val();
+                    return self.elements.promise.then(function (data) {
+                        return data.val();
+                    });
                 }
             },
             select: {
@@ -258,35 +268,65 @@
 
                     select = $('<select>');
                     select.addClass(self.options.cssClass);
+                    self.elements = $q.defer(); //Make your own promise
 
-                    if (self.options.values.length == 0) {
-                        $('<option>').appendTo(select);
-                    }
-
-                    $.each(self.options.values, function (ii, value) {
-                        $('<option>').val(value.value).text(value.label).appendTo(select);
-                    });
-
-                    self.elements = select.appendTo(th);
-
+                    var elements = select.appendTo(th);
                     if (typeof self.options.width !== 'undefined') {
-                        self.elements.css('width', self.options.width);
+                        elements.css('width', self.options.width);
                     } else {
-                        self.elements.css('width', '100%');
+                        elements.css('width', '100%');
                     }
 
-                    return self.elements;
+                    var defaultText = self.dataTableColumn.header().textContent;
+                    $('<option>').val('').text(defaultText).attr('translate', defaultText).appendTo(select);
+
+                    if (self.options.values.constructor.name == 'Promise') {
+                        self.options.values.then(
+                            function (data) {
+
+                                var r = [];
+                                for (var j = 0; j < data.length; j++) {
+                                    r[j] = {value: data[j][self.options.value], label: data[j][self.options.label]};
+                                }
+
+                                if (data.length == 0) {
+
+                                }
+                                $.each(r, function (ii, value) {
+                                    $('<option>').val(value.value).text(value.label).attr('translate', value.label).appendTo(select);
+                                })
+                                self.elements.resolve(elements);
+                            });
+                    } else {
+                        $.each(self.options.values, function (ii, value) {
+                            var val = value.value || value;
+                            var label = value.label || val;
+                            $('<option>').val(val).text(label).attr('translate', label).appendTo(select);
+                        });
+                        self.elements.resolve(elements);
+                    }
+
+                    return self.elements.promise;
+
                 },
                 bindEvents: function () {
                     var self = this;
 
-                    self.elements.on('change', function () {
-                        self.search();
+                    self.elements.promise.then(function (data) {
+                        data.on('change', function () {
+                            self.search();
+                        });
+
+                        if (self.options.default) {
+                            data.val(self.options.default).change();
+                        }
                     });
                 },
                 request: function () {
                     var self = this;
-                    return self.elements.val();
+                    return self.elements.promise.then(function (data) {
+                        return data.val();
+                    });
                 }
             },
             range: {
@@ -361,6 +401,8 @@
         factory(require('jquery'), require('datatables'));
     } else if (jQuery && !jQuery.fn.dataTable.ColumnFilter) {
         // Otherwise simply initialise as normal, stopping multiple evaluation
-        factory(jQuery, jQuery.fn.dataTable);
+        var $injector = angular.injector(['ng']);
+        var def = $injector.get('$q');
+        factory(jQuery, jQuery.fn.dataTable, def);
     }
 })(window, document);
