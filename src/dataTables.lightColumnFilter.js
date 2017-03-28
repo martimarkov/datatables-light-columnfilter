@@ -340,20 +340,28 @@
                  */
                 dom: function (th) {
                     var self = this;
+                    self.elements = $q.defer(); //Make your own promise
 
-                    self.elements = $('<input>', {
+                    var elements = $('<input>', {
                         type: self.options.type || 'text'
                     }).add($('<input>', {
                         type: self.options.type || 'text'
-                    })).appendTo(th);
+                    })).appendTo(th);;
+
+
+                    $.each(self.options.attr, function (key, value) {
+                        elements.attr(key, value);
+                    })
 
                     if (typeof self.options.width !== 'undefined') {
-                        self.elements.css('width', self.options.width);
+                        elements.css('width', self.options.width);
                     } else {
-                        self.elements.css('width', '50%');
+                        elements.css('width', '50%');
                     }
+                    self.elements.resolve(elements);
 
-                    return self.elements;
+
+                    return self.elements.promise;
                 },
                 /**
                  * Binds event to the DOM elements
@@ -362,9 +370,14 @@
                  */
                 bindEvents: function () {
                     var self = this;
+                    self.elements.promise.then(function (data) {
+                        data.on('change', function () {
+                            self.search();
+                        });
 
-                    self.elements.change(function () {
-                        self.search();
+                        if (self.options.default) {
+                            data.val(self.options.default).change();
+                        }
                     });
                 },
                 /**
@@ -373,16 +386,16 @@
                  * @returns {string}
                  */
                 request: function () {
-                    var
-                        self = this,
-                        request = []
-                        ;
+                    let self = this;
+                    let request = [];
 
-                    self.elements.each(function () {
-                        request.push($(this).val());
+                    return self.elements.promise.then(function (data) {
+                        data.each(function( index ) {
+                            request.push($(this).val());
+                        });
+
+                        return self.options.leftEncloser + request.join(self.options.separator) + self.options.rightEncloser;
                     });
-
-                    return request.join(self.options.separator);
                 }
             }
         };
