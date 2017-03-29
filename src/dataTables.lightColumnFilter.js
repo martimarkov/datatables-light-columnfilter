@@ -28,7 +28,7 @@
                         'bindEvents',
                         'request'
                     ]
-                    ;
+                ;
 
                 if (options.html in ColumnFilter.filter) {
                     defaultOptions = $.extend({}, ColumnFilter.filter[options.html]);
@@ -62,7 +62,7 @@
                 self.dataTable = null;
                 self.init(dataTable, options);
             }
-            ;
+        ;
 
         Column.prototype = {
             /**
@@ -123,7 +123,7 @@
                 var
                     self = this,
                     tr
-                    ;
+                ;
 
                 self.dataTable = dataTable;
 
@@ -136,7 +136,7 @@
                         columnOptions,
                         column,
                         th
-                        ;
+                    ;
 
                     if (never && ('responsive' in self.dataTable)) {
                         return;
@@ -232,7 +232,7 @@
                         time = 200,
                         regex = false,
                         timeOutId = 0
-                        ;
+                    ;
 
                     if ('time' in self.options) {
                         time = self.options.time;
@@ -331,6 +331,8 @@
             },
             range: {
                 separator: '~',
+                leftEnclosure: '',
+                rightEnclosure: '',
                 /**
                  * Build the form DOM elements
                  *
@@ -346,7 +348,8 @@
                         type: self.options.type || 'text'
                     }).add($('<input>', {
                         type: self.options.type || 'text'
-                    })).appendTo(th);;
+                    })).appendTo(th);
+                    ;
 
 
                     $.each(self.options.attr, function (key, value) {
@@ -374,9 +377,14 @@
                         data.on('change', function () {
                             self.search();
                         });
-
                         if (self.options.default) {
-                            data.val(self.options.default).change();
+                            //TODO: Remove enclosures
+                            let values = self.options.default.split(self.options.separator);
+                            data.each(function (index) {
+                                $(this).val(values[index]);
+                            });
+
+                            data.change();
                         }
                     });
                 },
@@ -390,18 +398,17 @@
                     let request = [];
 
                     return self.elements.promise.then(function (data) {
-                        data.each(function( index ) {
+                        data.each(function (index) {
                             request.push($(this).val());
                         });
 
-                        return self.options.leftEncloser + request.join(self.options.separator) + self.options.rightEncloser;
+                        return self.options.leftEnclosure + request.join(self.options.separator) + self.options.rightEnclosure;
                     });
                 }
             }
         };
 
         $.fn.dataTable.ColumnFilter = ColumnFilter;
-        $.fn.DataTable.ColumnFilter = ColumnFilter;
 
         return ColumnFilter;
     };
