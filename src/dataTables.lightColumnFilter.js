@@ -93,11 +93,16 @@
              *
              * @returns {void}
              */
-            search: function (regex) {
+            search: function (regex, exact) {
                 var self = this,
-                    regex = regex || false;
+                    regex = regex || false,
+                    exact = exact || false;
 
                 self.request().then(function (data) {
+                        if (exact === true) {
+                            data = '^' + data + '$'
+                            regex = true;
+                        }
                         self
                             .dataTableColumn
                             .search(data, regex)
@@ -142,10 +147,6 @@
                         return;
                     }
 
-                    if (!self.dataTable.column(index).visible()) {
-                        return;
-                    }
-
                     columnOptions = index in options ? options[index] : {};
                     column = new Column(
                         self.dataTable,
@@ -158,6 +159,10 @@
 
                     column.dom(th);
                     column.bindEvents();
+
+                    if (!self.dataTable.column(index).visible()) {
+                        th.hide();
+                    }
                 });
 
                 // Hide and Show column filter th according to datatable build-in columns visibility
@@ -231,6 +236,7 @@
                         self = this,
                         time = 200,
                         regex = false,
+                        exact = false,
                         timeOutId = 0
                     ;
 
@@ -241,13 +247,21 @@
                     if ('regex' in self.options) {
                         regex = self.options.regex;
                     }
+
+                    if ('exact' in self.options) {
+                        exact = self.options.exact;
+                    }
                     self.elements.promise.then(function (data) {
                         data.keyup(function () {
                             clearTimeout(timeOutId);
                             timeOutId = window.setTimeout(function () {
-                                self.search(regex);
+                                self.search(regex, exact);
                             }, time);
                         });
+
+                        if (self.options.default) {
+                            data.val(self.options.default).keyup();
+                        }
                     });
                 },
                 /**
@@ -297,7 +311,7 @@
                                 })
                                 self.elements.resolve(elements);
                             });
-                    } else {
+                    } else if (self.options.values.constructor.name == 'Array') {
                         $.each(self.options.values, function (ii, value) {
                             var val = value.value || value;
                             var label = value.label || val;
@@ -409,6 +423,7 @@
         };
 
         $.fn.dataTable.ColumnFilter = ColumnFilter;
+        $.fn.DataTable.ColumnFilter = ColumnFilter;
 
         return ColumnFilter;
     };
